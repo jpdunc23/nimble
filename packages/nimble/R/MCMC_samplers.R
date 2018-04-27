@@ -965,6 +965,11 @@ sampler_RW_PF <- nimbleFunction(
         gamma1          <- 0
         storeParticleLP <- -Inf
         storeLLVar      <- 0
+        scaleHistory  <- c(0, 0)   ## scaleHistory
+        acceptanceHistory  <- c(0, 0)   ## scaleHistory
+        if(nimbleOptions('saveMCMChistory')) {
+          saveMCMChistory <- TRUE
+        } else saveMCMChistory <- FALSE
         ## Number of LL estimates to compute to get each LL
         ## variance estimate for m optimization.
         nVarReps        <- 7   
@@ -1057,19 +1062,43 @@ sampler_RW_PF <- nimbleFunction(
             }
         },
         adaptiveProcedure = function(jump = logical()) {
-            timesRan <<- timesRan + 1
-            if(jump)     timesAccepted <<- timesAccepted + 1
-            if(timesRan %% adaptInterval == 0) {
-                acceptanceRate <- timesAccepted / timesRan
-                timesAdapted <<- timesAdapted + 1
-                gamma1 <<- 1/((timesAdapted + 3)^0.8)
-                gamma2 <- 10 * gamma1
-                adaptFactor <- exp(gamma2 * (acceptanceRate - optimalAR))
-                scale <<- scale * adaptFactor
-                timesRan <<- 0
-                timesAccepted <<- 0
-            }
+          timesRan <<- timesRan + 1
+          if(jump)     timesAccepted <<- timesAccepted + 1
+          if(timesRan %% adaptInterval == 0) {
+            acceptanceRate <- timesAccepted / timesRan
+            timesAdapted <<- timesAdapted + 1
+            if(saveMCMChistory) {
+              setSize(scaleHistory, timesAdapted)         ## scaleHistory
+              scaleHistory[timesAdapted] <<- scale        ## scaleHistory
+              setSize(acceptanceHistory, timesAdapted)         ## scaleHistory
+              acceptanceHistory[timesAdapted] <<- acceptanceRate  ## scaleHistory
+            }   
+            gamma1 <<- 1/((timesAdapted + 3)^0.8)
+            gamma2 <- 10 * gamma1
+            adaptFactor <- exp(gamma2 * (acceptanceRate - optimalAR))
+            scale <<- scale * adaptFactor
+            timesRan <<- 0
+            timesAccepted <<- 0
+          }
         },
+        getScaleHistory = function() {  ## scaleHistory
+          returnType(double(1))
+          if(saveMCMChistory) {
+            return(scaleHistory)
+          } else {
+            print("Please set 'nimbleOptions(saveMCMChistory = TRUE)' before building the MCMC")
+            return(numeric(1, 0))
+          }
+        },          
+        getAcceptanceHistory = function() {  ## scaleHistory
+          returnType(double(1))
+          if(saveMCMChistory) {
+            return(acceptanceHistory)
+          } else {
+            print("Please set 'nimbleOptions(saveMCMChistory = TRUE)' before building the MCMC")
+            return(numeric(1, 0))
+          }
+        },          
         reset = function() {
             scale <<- scaleOriginal
             timesRan      <<- 0
@@ -1077,6 +1106,10 @@ sampler_RW_PF <- nimbleFunction(
             timesAdapted  <<- 0
             storeParticleLP <<- -Inf
             gamma1 <<- 0
+            if(saveMCMChistory) {
+              scaleHistory  <<- c(0, 0)    ## scaleHistory
+              acceptanceHistory  <<- c(0, 0)
+            }
         }
     ), where = getLoadingNamespace()
 )

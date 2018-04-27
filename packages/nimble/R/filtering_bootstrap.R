@@ -219,18 +219,49 @@ buildBootstrapFilter <- nimbleFunction(
     varName <- varName[1]
     info <- model$getVarInfo(varName)
     latentDims <- info$nDim
+    
+    ## first lets figure out fixed indices
+    expandedNodes <- model$expandNodeNames(nodes = nodes)
+    ## individual indices for user-provided nodes
+    
+    nodesExp <- parse(text = nodes)[[1]]
+    if((length(nodesExp) > 1) && (nodesExp[[1]] != '[')) stop(paste0("invalid 'node' argument: ", nodes))
+    individualIndices <- gsub('\\]', '', gsub('.*\\[', '', nodes))
+    indicesPattern <- paste0('^',paste0(rep('(\\s*c\\(.*\\)|\\s*\\d+:\\d+|\\s*\\d+|\\s*)',
+                                            latentDims), collapse = ','))
+    matchString <- regexec(indicesPattern, individualIndices)
+    individualIndices <-  regmatches(individualIndices, matchString)[[1]][-1]
+    numericIndices <- list(length(individualIndices))
+    for(i in 1:length(individualIndices)){
+      thisIndex <- eval(parse(text = individualIndices[[i]]))
+      if(is.null(thisIndex)) numericIndices[[i]] <- info$mins[i]:info$maxs[i]
+      else numericIndices[[i]] <- thisIndex
+      if(any(!is.numeric(numericIndices[[i]]))) stop("non-numeric index used with 'node' argument")
+    }
+    browser()
+    ## actually, may want to use model parsing
+    ## e.g. dims(model[['x[1, 2:30, ]']])?
+    # scalarIndices <- sapply(individualIndices, function(x){
+    #   if(x == '') return(FALSE)
+    #   else if(grep(':', x, fixed = TRUE)) return(FALSE)
+    #   else if(grep('(', x, fixed = TRUE)) return(FALSE)
+    #   else return(TRUE)
+    # })
+    indexLengths <- sapply(numericIndices, length)
     if(is.null(timeIndex)){
-      timeIndex <- which.max(info$maxs)
-      timeLength <- max(info$maxs)
-      if(sum(info$maxs==timeLength)>1) # check if multiple dimensions share the max index size
+      maxLength <- max(indexLengths)
+      if(sum(indexLengths == maxLength) > 1)         
         stop("unable to determine which dimension indexes time. 
-             Specify manually using the 'timeIndex' control list argument")
+              Specify manually using the 'timeIndex' control list argument")
+      
+      timeIndex <- which.max(indexLengths)
+      timeLength <- maxLength
     } else{
-      timeLength <- info$maxs[timeIndex]
+      timeLength <- indexLengths[timeIndex]
     }
     
     my_initializeModel <- initializeModel(model, silent = silent)
-    
+
     nodes <- paste(info$varName,"[",rep(",", timeIndex-1), 1:timeLength,
                    rep(",", info$nDim - timeIndex),"]", sep="")
     dims <- lapply(nodes, function(n) nimDim(model[[n]]))

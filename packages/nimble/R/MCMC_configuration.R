@@ -291,7 +291,6 @@ Details: A single instance of the newly configured sampler is added to the end o
 
 Invisibly returns a list of the current sampler configurations, which are samplerConf reference class objects.
 '
-
             nameProvided <- !missing(name)
             if(is.character(type)) {
                 if(type == 'conjugate') {
