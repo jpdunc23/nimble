@@ -226,27 +226,28 @@ buildBootstrapFilter <- nimbleFunction(
     
     nodesExp <- parse(text = nodes)[[1]]
     if((length(nodesExp) > 1) && (nodesExp[[1]] != '[')) stop(paste0("invalid 'node' argument: ", nodes))
-    individualIndices <- gsub('\\]', '', gsub('.*\\[', '', nodes))
-    indicesPattern <- paste0('^',paste0(rep('(\\s*c\\(.*\\)|\\s*\\d+:\\d+|\\s*\\d+|\\s*)',
-                                            latentDims), collapse = ','))
-    matchString <- regexec(indicesPattern, individualIndices)
-    individualIndices <-  regmatches(individualIndices, matchString)[[1]][-1]
-    numericIndices <- list(length(individualIndices))
-    for(i in 1:length(individualIndices)){
-      thisIndex <- eval(parse(text = individualIndices[[i]]))
-      if(is.null(thisIndex)) numericIndices[[i]] <- info$mins[i]:info$maxs[i]
-      else numericIndices[[i]] <- thisIndex
-      if(any(!is.numeric(numericIndices[[i]]))) stop("non-numeric index used with 'node' argument")
+    if(length(nodesExp) == 1){
+      numericIndices <- list(latentDims)
+      individualIndices <- list(latentDims)
+      for(i in 1:latentDims){
+        numericIndices[[i]] <- info$mins[i]:info$maxs[i]
+        individualIndices[[i]] <- paste0(info$mins[i], ':', info$maxs[i])
+      }
     }
-    browser()
-    ## actually, may want to use model parsing
-    ## e.g. dims(model[['x[1, 2:30, ]']])?
-    # scalarIndices <- sapply(individualIndices, function(x){
-    #   if(x == '') return(FALSE)
-    #   else if(grep(':', x, fixed = TRUE)) return(FALSE)
-    #   else if(grep('(', x, fixed = TRUE)) return(FALSE)
-    #   else return(TRUE)
-    # })
+    else{
+      individualIndices <- gsub('\\]', '', gsub('.*\\[', '', nodes))
+      indicesPattern <- paste0('^',paste0(rep('(\\s*c\\(.*\\)|\\s*\\d+:\\d+|\\s*\\d+|\\s*)',
+                                              latentDims), collapse = ','))
+      matchString <- regexec(indicesPattern, individualIndices)
+      individualIndices <-  regmatches(individualIndices, matchString)[[1]][-1]
+      numericIndices <- list(length(individualIndices))
+      for(i in 1:length(individualIndices)){
+        thisIndex <- eval(parse(text = individualIndices[[i]]))
+        if(is.null(thisIndex)) numericIndices[[i]] <- info$mins[i]:info$maxs[i]
+        else numericIndices[[i]] <- thisIndex
+        if(any(!is.numeric(numericIndices[[i]]))) stop("non-numeric index used with 'node' argument")
+      }
+    }
     indexLengths <- sapply(numericIndices, length)
     if(is.null(timeIndex)){
       maxLength <- max(indexLengths)
@@ -262,8 +263,13 @@ buildBootstrapFilter <- nimbleFunction(
     
     my_initializeModel <- initializeModel(model, silent = silent)
 
-    nodes <- paste(info$varName,"[",rep(",", timeIndex-1), 1:timeLength,
-                   rep(",", info$nDim - timeIndex),"]", sep="")
+    timeIndices <- numericIndices[[timeIndex]]
+    
+    for(i in 1:timeLength){
+      individualIndices[[timeIndex]] <- timeIndices[i]
+      nodes[i] <- paste0(info$varName,"[", paste0(individualIndices, collapse = ','), "]")
+    }
+
     dims <- lapply(nodes, function(n) nimDim(model[[n]]))
     if(length(unique(dims)) > 1) stop('sizes or dimensions of latent states varies')
     vars <- model$getVarNames(nodes =  nodes)  # need var names too
@@ -277,7 +283,7 @@ buildBootstrapFilter <- nimbleFunction(
       
       names <- sapply(modelSymbolObjects, function(x)return(x$name))
       type <- sapply(modelSymbolObjects, function(x)return(x$type))
-      size <- lapply(modelSymbolObjects, function(x)return(x$size))
+      size <- list(indexLengths)
       
       mvEWSamples <- modelValues(modelValuesConf(vars = names,
                                               types = type,
@@ -296,7 +302,7 @@ buildBootstrapFilter <- nimbleFunction(
     else{
       names <- sapply(modelSymbolObjects, function(x)return(x$name))
       type <- sapply(modelSymbolObjects, function(x)return(x$type))
-      size <- lapply(modelSymbolObjects, function(x)return(x$size))
+      size <- list(indexLengths)
       size[[1]] <- as.numeric(dims[[1]])
       
       mvEWSamples <- modelValues(modelValuesConf(vars = names,
@@ -311,6 +317,7 @@ buildBootstrapFilter <- nimbleFunction(
                                               sizes = size))
       names <- names[1]
     }
+    brow
     
     bootStepFunctions <- nimbleFunctionList(bootStepVirtual)
     for(iNode in seq_along(nodes)){
