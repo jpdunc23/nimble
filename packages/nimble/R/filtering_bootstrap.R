@@ -41,7 +41,7 @@ bootFStep <- nimbleFunction(
     }
     else{
       allPrevNodes <- names
-      prevXName <- names    
+      prevXName <- names
       thisXName <- names
       currInd <- 1
       prevInd <- 1 
@@ -58,7 +58,6 @@ bootFStep <- nimbleFunction(
     llEst <- numeric(m, init=FALSE)
     ##declare(out, double(1,2))
     out <- numeric(2, init=FALSE)
-    
     for(i in 1:m) {
       if(notFirst) {  
         if(smoothing == 1){
@@ -283,8 +282,7 @@ buildBootstrapFilter <- nimbleFunction(
       
       names <- sapply(modelSymbolObjects, function(x)return(x$name))
       type <- sapply(modelSymbolObjects, function(x)return(x$type))
-      size <- list(indexLengths)
-      
+      size <- lapply(modelSymbolObjects, function(x)return(x$size))
       mvEWSamples <- modelValues(modelValuesConf(vars = names,
                                               types = type,
                                               sizes = size))
@@ -302,9 +300,12 @@ buildBootstrapFilter <- nimbleFunction(
     else{
       names <- sapply(modelSymbolObjects, function(x)return(x$name))
       type <- sapply(modelSymbolObjects, function(x)return(x$type))
-      size <- list(indexLengths)
-      size[[1]] <- as.numeric(dims[[1]])
-      
+      size <- lapply(modelSymbolObjects, function(x)return(x$size))
+      browser()
+      if(length(size[[1]]) > 1)
+        size[[1]] <- size[[1]][-timeIndex]
+      else 
+        size[[1]] <- 1
       mvEWSamples <- modelValues(modelValuesConf(vars = names,
                                               types = type,
                                               sizes = size))
@@ -315,10 +316,9 @@ buildBootstrapFilter <- nimbleFunction(
       mvWSamples  <- modelValues(modelValuesConf(vars = names,
                                               types = type,
                                               sizes = size))
-      names <- names[1]
+      names <- paste0(info$varName,"[", paste0(individualIndices[-timeIndex], collapse = ','), "]")
+
     }
-    brow
-    
     bootStepFunctions <- nimbleFunctionList(bootStepVirtual)
     for(iNode in seq_along(nodes)){
       bootStepFunctions[[iNode]] <- bootFStep(model, mvEWSamples, mvWSamples, nodes,

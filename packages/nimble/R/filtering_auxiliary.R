@@ -289,10 +289,10 @@ buildAuxiliaryFilter <- nimbleFunction(
     } else{
       timeLength <- info$maxs[timeIndex]
     }
-    nodes <- paste(info$varName,"[", 1:timeLength, ', ', fixedIndex, "]",sep = "")
+    # nodes <- paste(info$varName,"[", 1:timeLength, ', ', fixedIndex, "]",sep = "")
 
-    # nodes <- paste(info$varName,"[",rep(",", timeIndex-1), 1:timeLength,
-    #                rep(",", info$nDim - timeIndex),"]", sep="")
+    nodes <- paste(info$varName,"[",rep(",", timeIndex-1), 1:timeLength,
+                   rep(",", info$nDim - timeIndex),"]", sep="")
     dims <- lapply(nodes, function(n) nimDim(model[[n]]))
     if(length(unique(dims)) > 1) stop('sizes or dimensions of latent states varies')
     vars <- model$getVarNames(nodes =  nodes)  # need var names too
