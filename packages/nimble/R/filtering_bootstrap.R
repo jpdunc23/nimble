@@ -40,9 +40,9 @@ bootFStep <- nimbleFunction(
       }
     }
     else{
-      allPrevNodes <- names
-      prevXName <- names
-      thisXName <- names
+      allPrevNodes <- nodes[1]
+      prevXName <- nodes[1]    
+      thisXName <- nodes[1]
       currInd <- 1
       prevInd <- 1 
     }
@@ -51,13 +51,11 @@ bootFStep <- nimbleFunction(
   },
   run = function(m = integer(), threshNum = double(), prevSamp = logical()) {
     returnType(double(1))
-    ##declare(wts, double(1, m))
     wts <- numeric(m, init=FALSE)
     ids <- integer(m, 0)
-    ##declare(llEst, double(1,m))
     llEst <- numeric(m, init=FALSE)
-    ##declare(out, double(1,2))
     out <- numeric(2, init=FALSE)
+    
     for(i in 1:m) {
       if(notFirst) {  
         if(smoothing == 1){
@@ -218,11 +216,9 @@ buildBootstrapFilter <- nimbleFunction(
     varName <- varName[1]
     info <- model$getVarInfo(varName)
     latentDims <- info$nDim
-    
-    ## first lets figure out fixed indices
+        
     expandedNodes <- model$expandNodeNames(nodes = nodes)
     ## individual indices for user-provided nodes
-    
     nodesExp <- parse(text = nodes)[[1]]
     if((length(nodesExp) > 1) && (nodesExp[[1]] != '[')) stop(paste0("invalid 'node' argument: ", nodes))
     if(length(nodesExp) == 1){
@@ -301,11 +297,7 @@ buildBootstrapFilter <- nimbleFunction(
       names <- sapply(modelSymbolObjects, function(x)return(x$name))
       type <- sapply(modelSymbolObjects, function(x)return(x$type))
       size <- lapply(modelSymbolObjects, function(x)return(x$size))
-      browser()
-      if(length(size[[1]]) > 1)
-        size[[1]] <- size[[1]][-timeIndex]
-      else 
-        size[[1]] <- 1
+      size[[1]][timeIndex] <- 1
       mvEWSamples <- modelValues(modelValuesConf(vars = names,
                                               types = type,
                                               sizes = size))
@@ -316,8 +308,7 @@ buildBootstrapFilter <- nimbleFunction(
       mvWSamples  <- modelValues(modelValuesConf(vars = names,
                                               types = type,
                                               sizes = size))
-      names <- paste0(info$varName,"[", paste0(individualIndices[-timeIndex], collapse = ','), "]")
-
+      names <- names[1]
     }
     bootStepFunctions <- nimbleFunctionList(bootStepVirtual)
     for(iNode in seq_along(nodes)){

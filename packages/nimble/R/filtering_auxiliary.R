@@ -248,9 +248,7 @@ return(0)
 buildAuxiliaryFilter <- nimbleFunction(
     name = 'buildAuxiliaryFilter',
   setup = function(model, nodes, control = list()) {
-    
-   fixedIndex <- control[['fixedIndex']]
-    
+  
     #control list extraction
     saveAll <- control[['saveAll']]
     smoothing <- control[['smoothing']]
@@ -273,35 +271,60 @@ buildAuxiliaryFilter <- nimbleFunction(
     }
     
     #latent state info
-    varName <- sapply(nodes, function(x){return(model$getVarNames(nodes = x))})
-    if(length(unique(varName))>1){
-      stop("all latent nodes must come from same variable")
+    expandedNodes <- model$expandNodeNames(nodes = nodes)
+    ## individual indices for user-provided nodes
+    nodesExp <- parse(text = nodes)[[1]]
+    if((length(nodesExp) > 1) && (nodesExp[[1]] != '[')) stop(paste0("invalid 'node' argument: ", nodes))
+    if(length(nodesExp) == 1){
+      numericIndices <- list(latentDims)
+      individualIndices <- list(latentDims)
+      for(i in 1:latentDims){
+        numericIndices[[i]] <- info$mins[i]:info$maxs[i]
+        individualIndices[[i]] <- paste0(info$mins[i], ':', info$maxs[i])
+      }
     }
-    varName <- varName[1]
-    info <- model$getVarInfo(varName)
-    latentDims <- info$nDim
+    else{
+      individualIndices <- gsub('\\]', '', gsub('.*\\[', '', nodes))
+      indicesPattern <- paste0('^',paste0(rep('(\\s*c\\(.*\\)|\\s*\\d+:\\d+|\\s*\\d+|\\s*)',
+                                              latentDims), collapse = ','))
+      matchString <- regexec(indicesPattern, individualIndices)
+      individualIndices <-  regmatches(individualIndices, matchString)[[1]][-1]
+      numericIndices <- list(length(individualIndices))
+      for(i in 1:length(individualIndices)){
+        thisIndex <- eval(parse(text = individualIndices[[i]]))
+        if(is.null(thisIndex)) numericIndices[[i]] <- info$mins[i]:info$maxs[i]
+        else numericIndices[[i]] <- thisIndex
+        if(any(!is.numeric(numericIndices[[i]]))) stop("non-numeric index used with 'node' argument")
+      }
+    }
+    indexLengths <- sapply(numericIndices, length)
     if(is.null(timeIndex)){
-      timeIndex <- which.max(info$maxs)
-      timeLength <- max(info$maxs)
-      if(sum(info$maxs==timeLength)>1) # check if multiple dimensions share the max index size
+      maxLength <- max(indexLengths)
+      if(sum(indexLengths == maxLength) > 1)         
         stop("unable to determine which dimension indexes time. 
              Specify manually using the 'timeIndex' control list argument")
+      
+      timeIndex <- which.max(indexLengths)
+      timeLength <- maxLength
     } else{
-      timeLength <- info$maxs[timeIndex]
+      timeLength <- indexLengths[timeIndex]
     }
-    # nodes <- paste(info$varName,"[", 1:timeLength, ', ', fixedIndex, "]",sep = "")
-
-    nodes <- paste(info$varName,"[",rep(",", timeIndex-1), 1:timeLength,
-                   rep(",", info$nDim - timeIndex),"]", sep="")
+    
+    my_initializeModel <- initializeModel(model, silent = silent)
+    
+    timeIndices <- numericIndices[[timeIndex]]
+    
+    for(i in 1:timeLength){
+      individualIndices[[timeIndex]] <- timeIndices[i]
+      nodes[i] <- paste0(info$varName,"[", paste0(individualIndices, collapse = ','), "]")
+    }
+    
     dims <- lapply(nodes, function(n) nimDim(model[[n]]))
     if(length(unique(dims)) > 1) stop('sizes or dimensions of latent states varies')
     vars <- model$getVarNames(nodes =  nodes)  # need var names too
     
-    my_initializeModel <- initializeModel(model, silent = silent)
-    
-    
     # Create mv variables for x state and sampled x states.  If saveAll=TRUE, 
-    # the sampled x states will be recorded at each time point. 
+    # the sampled x states will be recorded at each time point.
     modelSymbolObjects <- model$getSymbolTable()$getSymbolObjects()[vars]
     if(saveAll){
       
@@ -309,36 +332,35 @@ buildAuxiliaryFilter <- nimbleFunction(
       type <- sapply(modelSymbolObjects, function(x)return(x$type))
       size <- lapply(modelSymbolObjects, function(x)return(x$size))
       mvEWSamples <- modelValues(modelValuesConf(vars = names,
-                                              types = type,
-                                              sizes = size))
+                                                 types = type,
+                                                 sizes = size))
       
       names <- c(names, "wts")
       type <- c(type, "double")
       size$wts <- length(dims)
-      if(smoothing == T){
-        size$wts <- 1 ##  only need one weight per particle (at time T) if smoothing == TRUE
-      }
+      if(smoothing == TRUE)
+        size$wts <- 1  ##  only need one weight per particle (at time T) if smoothing == TRUE
       mvWSamples  <- modelValues(modelValuesConf(vars = names,
-                                              types = type,
-                                              sizes = size))
+                                                 types = type,
+                                                 sizes = size))
       
     }
     else{
       names <- sapply(modelSymbolObjects, function(x)return(x$name))
       type <- sapply(modelSymbolObjects, function(x)return(x$type))
       size <- lapply(modelSymbolObjects, function(x)return(x$size))
-      size[[1]] <- as.numeric(dims[[1]])
-      
+      size[[1]][timeIndex] <- 1
       mvEWSamples <- modelValues(modelValuesConf(vars = names,
-                                              types = type,
-                                              sizes = size))
+                                                 types = type,
+                                                 sizes = size))
       
       names <- c(names, "wts")
       type <- c(type, "double")
       size$wts <- 1
       mvWSamples  <- modelValues(modelValuesConf(vars = names,
-                                              types = type,
-                                              sizes = size))
+                                                 types = type,
+                                                 sizes = size))
+      names <- names[1]
     }
     names <- names[1]
     auxStepFunctions <- nimbleFunctionList(auxStepVirtual)
