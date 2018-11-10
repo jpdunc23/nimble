@@ -364,7 +364,7 @@ buildIteratedFilter2 <- nimbleFunction(
     params <- model$expandNodeNames(params, sort = TRUE)
     sortingOrder <- sapply(unsortParams, function(x)return(which(x == params)))
     if(identical(params, character(0)))
-      stop('must be at least one higher level parameter for Liu and West filter to work')
+      stop('must be at least one higher level parameter for IF2 to work')
     if(any(params %in% nodes))
       stop('parameters cannot be latent states')
     if(!all(params%in%model$getNodeNames(stochOnly=TRUE)))
@@ -372,7 +372,7 @@ buildIteratedFilter2 <- nimbleFunction(
     paramVars <-  model$getVarNames(nodes =  params)  # need var names too
     pardimcheck <- sapply(paramVars, function(n){
       if(length(nimDim(model[[n]]))>1)
-        stop("Iterated filter 2 doesn't work for matrix valued top level parameters")
+        stop("IF2 doesn't work for matrix valued top level parameters")
     })
     
     dims <- lapply(nodes, function(n) nimDim(model[[n]]))
