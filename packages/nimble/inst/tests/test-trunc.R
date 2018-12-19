@@ -24,7 +24,7 @@ nimbleOptions(MCMCprogressBar = FALSE)
 models <- c('kidney', 'litters', 'mice')
 
 ### test basic model building
-sapply(models, testBUGSmodel, useInits = TRUE)
+out <- sapply(models, testBUGSmodel, useInits = TRUE)
 
 # we haven't updated conjugacy to deal with truncation
 # so litters is reporting conj post density as wrong since
@@ -42,7 +42,7 @@ testBUGSmodel('lsat', dir = "", model = file.path(tempdir(), "lsat.bug"), data =
 
 
 ### test MCMC
-sapply(models, test_mcmc, numItsC = 1000)
+out <- sapply(models, test_mcmc, numItsC = 1000)
 
 # this takes forever because of MCMC - rewrite to not do basic
 if(FALSE) {
@@ -131,7 +131,7 @@ test_that("Test that MCMC respects truncation bounds", {
     Cmcmc$run(5000)
     smp <- as.matrix(Cmcmc$mvSamples)
     expect_gt(min(smp), 0.2, label = "minimum in MCMC", expected.label = "lower bound")
-    expect_lt(min(smp), 2, label = "maximum in MCMC", expected.label = "upper bound")
+    expect_lt(max(smp), 2, label = "maximum in MCMC", expected.label = "upper bound")
 
     test_mcmc(model = code, data = c(data, constants), inits = inits,
               results = list(mean = list(mu = 1.5), sd = list(mu = .27 )),
