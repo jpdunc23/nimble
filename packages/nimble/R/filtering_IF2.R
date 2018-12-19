@@ -250,7 +250,7 @@ IF2Step <- nimbleFunction(
 #'  are not in the set of latent nodes specified in \code{nodes}.
 #' @param control  A list specifying different control options for the IF2 algorithm.  Options are described in the details section below.
 
-#' @author Nicholas Michaud
+#' @author Nicholas Michaud and Dao Nguyen
 #' @family particle filtering methods
 #' @details 
 #' 
@@ -284,11 +284,10 @@ IF2Step <- nimbleFunction(
 #' my_IF2 <- buildIteratedFilter2(model, 'x[1:100]', params = 'sigma_x')
 #' Cmodel <- compileNimble(model)
 #' Cmy_IF2 <- compileNimble(my_IF2, project = model)
-#' Cmy_IF2$run(10000, 10)
-#' IF2_X <- as.matrix(Cmy_IF2$mvEWSamples, 'x')
-#' 
-#' #  samples from posterior of a top level parameter named sigma_x:
-#' IF2_sigma_x <- as.matrix(Cmy_IF2$mvEWSamples, 'sigma_x')
+#' # MLE estimate of a top level parameter named sigma_x:
+#' sigma_x_MLE <- Cmy_IF2$run(m = 10000, n = 10)
+#' # Continue running algorithm for more precise estimate:
+#' sigma_x_MLE <- Cmy_IF2$continueRun(n = 10) 
 #' }
 buildIteratedFilter2 <- nimbleFunction(
   setup = function(model, nodes, params = NULL, control = list()){
